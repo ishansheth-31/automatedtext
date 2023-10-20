@@ -12,11 +12,11 @@ def get_formatted_date():
     return formatted_date
 
 # Get environment variables
-cohere_api_key = 'abVbU5puEUTBnsGQq8hPXnAeH9JtGvH9pIstM5z9'
-twilio_account_sid = 'AC550489d0cf20897e81015e172989a7e9'
-twilio_auth_token = '3da2be03d8a2d2259fb7f800b44d7b4d'
-to_phone_number = '+14049155010'
-twilio_sender_phone_number = '+18778425481'
+cohere_api_key = os.environ.get('CO_API_KEY')
+twilio_account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
+twilio_auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
+to_phone_number = os.environ.get('TO_PHONE_NUMBER')
+twilio_sender_phone_number = os.environ.get('TWILIO_SENDER_PHONE_NUMBER')
 
 # News and markets urls alongside cohere key for summarization
 url = "https://theweek.com/digest/round-up/10-things-you-need-to-know-today-"+get_formatted_date()
@@ -61,9 +61,6 @@ def get_markets_text(url):
 
     return scraped
 
-markets_text = get_markets_text(markets_url)
-article_text = get_article_text(url)
-
 # text summarization function using cohere api
 def cohere_summarizer(co, text):
     try:
@@ -79,9 +76,6 @@ def cohere_summarizer(co, text):
         return summary
     except:
         return "No news today, something's wrong"
-
-article_summary = cohere_summarizer(co, article_text)
-markets_summary = cohere_summarizer(co, markets_text)
 
 # finally building the full text message using both summaries and some personal touches
 def string_builder(article, markets):
@@ -113,26 +107,44 @@ def string_builder(article, markets):
 """
     return final_string
 
-built_string = string_builder(article_summary, markets_summary)
-
-# Check if built_string exceeds a character limit
-character_limit = 1600
-while len(built_string) > character_limit:
-    
+def lambda_handler(event, context):
     markets_text = get_markets_text(markets_url)
     article_text = get_article_text(url)
-    
     article_summary = cohere_summarizer(co, article_text)
     markets_summary = cohere_summarizer(co, markets_text)
-    
     built_string = string_builder(article_summary, markets_summary)
 
-# Initialize Twilio client
-client = Client(twilio_account_sid, twilio_auth_token)
+    character_limit = 1600
+    while len(built_string) > character_limit:
+        markets_text = get_markets_text(markets_url)
+        article_text = get_article_text(url)
+        article_summary = cohere_summarizer(co, article_text)
+        markets_summary = cohere_summarizer(co, markets_text)
+        built_string = string_builder(article_summary, markets_summary)
 
-# Send the message
-message = client.messages.create(
-    from_=twilio_sender_phone_number,
-    body=built_string,
-    to=to_phone_number
-)
+    # Initialize Twilio client
+    client = Client(twilio_account_sid, twilio_auth_token)
+
+    try:
+        # Send the message
+        message = client.messages.create(
+            from_=twilio_sender_phone_number,
+            body=built_string,
+            to=to_phone_number
+        )
+        
+        # Extract relevant information from the Twilio MessageInstance
+        response_data = {
+            "message_sid": message.sid,
+            "status": message.status,
+            "date_sent": message.date_sent,
+        }
+
+        return response_data
+    except Exception as e:
+        # Handle the Twilio message sending error
+        print("Message couldn't send:", str(e))
+        return "Message couldn't send"
+
+
+
