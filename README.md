@@ -8,10 +8,6 @@ Morning Assistant is a Python script designed to help you start your day with es
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
-  - [Configuration](#configuration)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
 
 ## Features
 - Summarizes news articles for easy reading.
